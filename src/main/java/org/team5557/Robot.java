@@ -2,102 +2,172 @@
 // Open Source Software; you can modify and/or share it under the terms of
 // the WPILib BSD license file in the root directory of this project.
 
-package frc.robot;
+package org.team5557;
 
+import org.team5557.Constants.Mode;
+import org.team5557.subsystems.LEDs.State;
+
+import java.io.File;
+import java.io.FileWriter;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Paths;
+
+import org.library.team6328.Alert;
+import org.library.team6328.Alert.AlertType;
+import org.littletonrobotics.junction.LogFileUtil;
+import org.littletonrobotics.junction.LoggedRobot;
+import org.littletonrobotics.junction.Logger;
+import org.littletonrobotics.junction.inputs.LoggableInputs;
+import org.littletonrobotics.junction.inputs.LoggedPowerDistribution;
+import org.littletonrobotics.junction.inputs.LoggedSystemStats;
+import org.littletonrobotics.junction.networktables.NT4Publisher;
+import org.littletonrobotics.junction.wpilog.WPILOGReader;
+import org.littletonrobotics.junction.wpilog.WPILOGWriter;
+
+import edu.wpi.first.networktables.NetworkTableInstance;
+import edu.wpi.first.wpilibj.PowerDistribution;
+import edu.wpi.first.wpilibj.Threads;
 import edu.wpi.first.wpilibj.TimedRobot;
+import edu.wpi.first.wpilibj.PowerDistribution.ModuleType;
 import edu.wpi.first.wpilibj2.command.Command;
 import edu.wpi.first.wpilibj2.command.CommandScheduler;
+import edu.wpi.first.wpilibj.DriverStation;
 
-/**
- * The VM is configured to automatically run this class, and to call the functions corresponding to
- * each mode, as described in the TimedRobot documentation. If you change the name of this class or
- * the package after creating this project, you must also update the build.gradle file in the
- * project.
- */
-public class Robot extends TimedRobot {
+public class Robot extends LoggedRobot {
   private Command m_autonomousCommand;
 
   private RobotContainer m_robotContainer;
 
-  /**
-   * This function is run when the robot is first started up and should be used for any
-   * initialization code.
-   */
+  private RobotContainer robotContainer;
+  private WPILOGWriter logReceiver;
+  private Command autoCommand;
+  private double autoStart;
+  private boolean autoMessagePrinted;
+  private boolean batteryNameWritten = false;
+
+  private final Alert logNoFileAlert =
+      new Alert("No log path set for current robot. Data will NOT be logged.",
+          AlertType.WARNING);
+  private final Alert logReceiverQueueAlert =
+      new Alert("Logging queue exceeded capacity, data will NOT be logged.",
+          AlertType.ERROR);
+  private final Alert logOpenFileAlert = new Alert(
+      "Failed to open log file. Data will NOT be logged.", AlertType.ERROR);
+  private final Alert logWriteAlert =
+      new Alert("Failed write to the log file. Data will NOT be logged.",
+          AlertType.ERROR);
+  private final Alert sameBatteryAlert =
+      new Alert("The battery has not been changed since the last match.",
+          AlertType.WARNING);
+
+  public Robot() {
+    super(Constants.kloop_period);
+  }
+
   @Override
   public void robotInit() {
-    // Instantiate our RobotContainer.  This will perform all our button bindings, and put our
-    // autonomous chooser on the dashboard.
     m_robotContainer = new RobotContainer();
+
+    Logger logger = Logger.getInstance();
+    setUseTiming(Constants.getRobotMode() != Mode.REPLAY);
+    logger.recordMetadata("Robot", Constants.getRobotMode().toString());
+    logger.recordMetadata("TuningMode", Boolean.toString(Constants.tuning_mode));
+    logger.recordMetadata("RuntimeType", getRuntimeType().toString());
+    /*
+    logger.recordMetadata("BatteryName", BatteryTracker.scanBattery(1.0));
+    logger.recordMetadata("ProjectName", BuildConstants.MAVEN_NAME);
+    logger.recordMetadata("BuildDate", BuildConstants.BUILD_DATE);
+    logger.recordMetadata("GitSHA", BuildConstants.GIT_SHA);
+    logger.recordMetadata("GitDate", BuildConstants.GIT_DATE);
+    logger.recordMetadata("GitBranch", BuildConstants.GIT_BRANCH);
+    switch (BuildConstants.DIRTY) {
+      case 0:
+        logger.recordMetadata("GitDirty", "All changes committed");
+        break;
+      case 1:
+        logger.recordMetadata("GitDirty", "Uncomitted changes");
+        break;
+      default:
+        logger.recordMetadata("GitDirty", "Unknown");
+        break;
+    }
+    */
+
+    switch (Constants.getRobotMode()) {
+      case REAL:
+        logReceiver = new WPILOGWriter("/media/sda1/");
+        logger.addDataReceiver(logReceiver);
+        logger.addDataReceiver(new NT4Publisher());
+        LoggedPowerDistribution.getInstance(0, PowerDistribution.ModuleType.kRev);
+        //LoggedSystemStats.getInstance().setPowerDistributionConfig(50, ModuleType.kRev);
+        break;
+      case REPLAY:
+        setUseTiming(false); // Run as fast as possible
+        String logPath = LogFileUtil.findReplayLog();
+        logger.setReplaySource(new WPILOGReader(logPath));
+        logger.addDataReceiver(new WPILOGWriter(LogFileUtil.addPathSuffix(logPath, "_sim")));
+        break;
+    }
+    logger.start();
   }
 
-  /**
-   * This function is called every 20 ms, no matter the mode. Use this for items like diagnostics
-   * that you want ran during disabled, autonomous, teleoperated and test.
-   *
-   * <p>This runs after the mode specific periodic functions, but before LiveWindow and
-   * SmartDashboard integrated updating.
-   */
   @Override
   public void robotPeriodic() {
-    // Runs the Scheduler.  This is responsible for polling buttons, adding newly-scheduled
-    // commands, running already-scheduled commands, removing finished or interrupted commands,
-    // and running subsystem periodic() methods.  This must be called from the robot's periodic
-    // block in order for anything in the Command-based framework to work.
+    Threads.setCurrentThreadPriority(true, 99);
     CommandScheduler.getInstance().run();
+    
+    Logger.getInstance().recordOutput("ActiveCommands/Scheduler",
+        NetworkTableInstance.getDefault()
+            .getEntry("/LiveWindow/Ungrouped/Scheduler/Names")
+            .getStringArray(new String[] {}));
+            
+    Threads.setCurrentThreadPriority(true, 10);
   }
 
-  /** This function is called once each time the robot enters Disabled mode. */
   @Override
-  public void disabledInit() {}
+  public void disabledInit() {
+  }
 
   @Override
-  public void disabledPeriodic() {}
+  public void disabledPeriodic() {
+    m_robotContainer.getLEDs().requestState(State.RAINBOW);
+  }
 
-  /** This autonomous runs the autonomous command selected by your {@link RobotContainer} class. */
   @Override
   public void autonomousInit() {
-    m_autonomousCommand = m_robotContainer.getAutonomousCommand();
+    robotContainer.getAutonomousChooser().getCommand(robotContainer).schedule();
 
-    // schedule the autonomous command (example)
     if (m_autonomousCommand != null) {
       m_autonomousCommand.schedule();
     }
   }
 
-  /** This function is called periodically during autonomous. */
   @Override
   public void autonomousPeriodic() {}
 
   @Override
   public void teleopInit() {
-    // This makes sure that the autonomous stops running when
-    // teleop starts running. If you want the autonomous to
-    // continue until interrupted by another command, remove
-    // this line or comment it out.
     if (m_autonomousCommand != null) {
       m_autonomousCommand.cancel();
     }
   }
 
-  /** This function is called periodically during operator control. */
   @Override
   public void teleopPeriodic() {}
 
   @Override
   public void testInit() {
-    // Cancels all running commands at the start of test mode.
     CommandScheduler.getInstance().cancelAll();
   }
 
-  /** This function is called periodically during test mode. */
   @Override
   public void testPeriodic() {}
 
-  /** This function is called once when the robot is first started up. */
   @Override
   public void simulationInit() {}
 
-  /** This function is called periodically whilst in simulation. */
   @Override
   public void simulationPeriodic() {}
 }
