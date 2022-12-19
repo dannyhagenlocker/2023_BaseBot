@@ -46,6 +46,8 @@ public class Swerve extends SubsystemBase {
     public static final double MAX_ANGULAR_VELOCITY_RADIANS_PER_SECOND = MAX_VELOCITY_METERS_PER_SECOND
             / Math.hypot(Constants.superstructure.trackwidth / 2.0, Constants.superstructure.drivebase / 2.0);
 
+    public static final double ROTATIONAL_STATIC_CONSTANT = 0.3;
+
     public static final double DRIVETRAIN_CURRENT_LIMIT = 50.0;
 
     public final PIDController xController = new PIDController(5.0, 0.0, 0.0);
@@ -74,6 +76,7 @@ public class Swerve extends SubsystemBase {
 
     private ChassisSpeeds currentVelocity = new ChassisSpeeds();
     private ChassisSpeeds chassisSpeeds = new ChassisSpeeds(0.0, 0.0, 0.0);
+    private Translation2d centerOfRotation = new Translation2d();
 
     private final GenericEntry motorOutputPercentageLimiterEntry;
     private final Field2d field = new Field2d();
@@ -260,8 +263,14 @@ public class Swerve extends SubsystemBase {
     /**
      * Sets the desired chassis speed of the drivetrain.
      */
-    public void drive(ChassisSpeeds chassisSpeeds) {
-        this.chassisSpeeds = chassisSpeeds;
+    public void drive(ChassisSpeeds chassisSpeeds, boolean fieldRelative, Translation2d centerOfRotation) {
+        this.centerOfRotation = centerOfRotation;
+        if (fieldRelative) {
+            this.chassisSpeeds = ChassisSpeeds.fromFieldRelativeSpeeds(
+                chassisSpeeds.vxMetersPerSecond, chassisSpeeds.vyMetersPerSecond, chassisSpeeds.omegaRadiansPerSecond, getPose().getRotation());
+        } else {
+            this.chassisSpeeds = new ChassisSpeeds(chassisSpeeds.vxMetersPerSecond, chassisSpeeds.vyMetersPerSecond, chassisSpeeds.omegaRadiansPerSecond);
+        }
     }
 
     public void periodic() {
@@ -279,27 +288,11 @@ public class Swerve extends SubsystemBase {
                 currentBackLeftModuleState, currentBackRightModuleState);
 
         estimator.update(getGyroscopeRotation(), swerveModuleStates, getModulePositions());
-        
-        /*
-        var driveSignalOpt = follower.update(Utilities.poseToRigidTransform(getPose()),
-                new Vector2(currentVelocity.vxMetersPerSecond, currentVelocity.vyMetersPerSecond),
-                currentVelocity.omegaRadiansPerSecond, Timer.getFPGATimestamp(), Robot.kDefaultPeriod);
-        
-        if (driveSignalOpt.isPresent()) {
-            HolonomicDriveSignal driveSignal = driveSignalOpt.get();
-            if (driveSignalOpt.get().isFieldOriented()) {
-                chassisSpeeds = ChassisSpeeds.fromFieldRelativeSpeeds(driveSignal.getTranslation().x,
-                        driveSignal.getTranslation().y, driveSignal.getRotation(), getPose().getRotation());
-            } else {
-                chassisSpeeds = new ChassisSpeeds(driveSignal.getTranslation().x, driveSignal.getTranslation().y,
-                        driveSignal.getRotation());
-            }
-        }*/
 
         motorOutputLimiter = motorOutputPercentageLimiterEntry.getDouble(0.0) / 100;
 
         if (!isXED) {
-                SwerveModuleState[] states = kinematics.toSwerveModuleStates(chassisSpeeds);
+                SwerveModuleState[] states = kinematics.toSwerveModuleStates(chassisSpeeds, centerOfRotation);
                 SwerveDriveKinematics.desaturateWheelSpeeds(states, MAX_VELOCITY_METERS_PER_SECOND);
                 frontLeftModule.set(states[0].speedMetersPerSecond / MAX_VELOCITY_METERS_PER_SECOND * MAX_VOLTAGE,
                         states[0].angle.getRadians());

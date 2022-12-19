@@ -1,4 +1,4 @@
-package org.team5557.Vision;
+package org.team5557.vision;
 
 import java.sql.Time;
 import java.util.Collections;
@@ -38,17 +38,23 @@ public class VisionManager extends SubsystemBase {
 
     private double statusExpiryTime = 0.0;
     private final Swerve swerve;
-    private final RobotContainer container;
     private final PhotonCameraExtension photonCamera;
+    private final PhotonCameraExtension driverCamera;
     private final List<PhotonCameraExtension> camera_list;
+    private final List<PhotonCameraExtension> driver_camera_list;
 
-    public VisionManager(RobotContainer container) {
-        this.container = container;
-        this.swerve = container.getSwerve();
+    public VisionManager() {
+        this.swerve = RobotContainer.swerve;
         this.photonCamera = new PhotonCameraExtension("limelight", new Transform3d());
         camera_list = Collections.unmodifiableList(
             List.of(
                 photonCamera
+            )
+        );
+        this.driverCamera = new PhotonCameraExtension("AR-O134", new Transform3d());
+        driver_camera_list = Collections.unmodifiableList(
+            List.of(
+                driverCamera
             )
         );
 
@@ -73,7 +79,7 @@ public class VisionManager extends SubsystemBase {
                 Transform3d camToTarget = target.getBestCameraToTarget();
                 Pose3d camPose = targetPose.get().transformBy(camToTarget.inverse());
                 var visionMeasurement = camPose.transformBy(camera.CAMERA_TO_ROBOT);
-                Hotspot hotspot = container.getGoalPlanner().getHotspot();
+                Hotspot hotspot = RobotContainer.goal_planner.getHotspot();
                 if(fiducialId == hotspot.getAssociatedTarget().ID && visionMeasurement.toPose2d().getTranslation().getNorm() < Constants.estimator.max_high_accuracy_distance) {
                     swerve.getEstimator().addVisionMeasurement(visionMeasurement.toPose2d(), imageCaptureTime, Constants.estimator.highAccuracyVisionStdDevs);
                     statusExpiryTime = Timer.getFPGATimestamp() + 0.1;

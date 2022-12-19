@@ -2,18 +2,21 @@ package org.team5557.commands.Swerve;
 
 import org.littletonrobotics.junction.Logger;
 import org.team5557.Constants;
-import org.team5557.Vision.GoalPlanner;
-import org.team5557.Vision.Hotspot;
-import org.team5557.Vision.VisionManager;
+import org.team5557.Robot;
+import org.team5557.RobotContainer;
 import org.team5557.subsystems.LEDs;
 import org.team5557.subsystems.Swerve;
 import org.team5557.subsystems.LEDs.State;
+import org.team5557.vision.GoalPlanner;
+import org.team5557.vision.Hotspot;
+import org.team5557.vision.VisionManager;
 
 import com.pathplanner.lib.PathConstraints;
 import com.pathplanner.lib.PathPlanner;
 import com.pathplanner.lib.PathPlannerTrajectory;
 import com.pathplanner.lib.PathPoint;
 import com.pathplanner.lib.PathPlannerTrajectory.PathPlannerState;
+import com.pathplanner.lib.commands.PPSwerveControllerCommand;
 import com.pathplanner.lib.controllers.PPHolonomicDriveController;
 import com.pathplanner.lib.server.PathPlannerServer;
 
@@ -46,31 +49,20 @@ public class CoPilotCommand extends CommandBase{
     private final HashMap<Command, Boolean> currentCommands = new HashMap<>();
     private final List<PathPlannerTrajectory.EventMarker> unpassedMarkers = new ArrayList<>();
     */
-
     private final Swerve swerve;
     private final GoalPlanner goalPlanner;
     private final VisionManager visionManager;
     private final PeriodicIO m_periodicIO;
-    private LEDs leds;
+    private final LEDs leds;
 
     public CoPilotCommand(
-        Swerve swerve,
-        GoalPlanner goalPlanner,
-        VisionManager visionManager,
-        LEDs leds,
         DoubleSupplier translationXSupplier, DoubleSupplier translationYSupplier, DoubleSupplier rotationSupplier,
-        //List<PathPlannerTrajectory.EventMarker> pathMarkers,
-        //HashMap<String, Command> eventMap,
         Subsystem... requirements) {
-      this.swerve = swerve;
-      this.goalPlanner = goalPlanner;
-      this.visionManager = visionManager;
-      this.leds = leds;
+      this.swerve = RobotContainer.swerve;
+      this.leds = RobotContainer.leds;
+      this.goalPlanner = RobotContainer.goal_planner;
+      this.visionManager = RobotContainer.vision_manager;
       this.controller = swerve.getFollower();
-
-      //this.pathMarkers = pathMarkers;
-      //this.eventMap = eventMap;
-
       this.m_translationXSupplier = translationXSupplier;
       this.m_translationYSupplier = translationYSupplier;
       this.m_rotationSupplier = rotationSupplier;
@@ -80,7 +72,7 @@ public class CoPilotCommand extends CommandBase{
       m_periodicIO.active_hotspot = goalPlanner.getHotspot();
       controller.setTolerance(m_periodicIO.active_hotspot.getErrorRadius());
 
-      addRequirements(requirements);
+      addRequirements(swerve);
     }
 
     @Override
@@ -154,7 +146,7 @@ public class CoPilotCommand extends CommandBase{
     }
 
     public synchronized void writePeriodicOutputs() {
-        swerve.drive(m_periodicIO.target_chassis_speeds);
+        swerve.drive(m_periodicIO.target_chassis_speeds, true, Constants.superstructure.center_of_rotation);
         swerve.setXED(m_periodicIO.should_X);
 
         switch (m_periodicIO.current_mode) {

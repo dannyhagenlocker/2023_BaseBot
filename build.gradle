@@ -1,6 +1,9 @@
+import edu.wpi.first.gradlerio.deploy.roborio.RoboRIO
+
 plugins {
     id "java"
     id "edu.wpi.first.GradleRIO" version "2023.1.1-beta-4"
+    id "com.peterabeles.gversion" version "1.10"
 }
 
 sourceCompatibility = JavaVersion.VERSION_11
@@ -25,6 +28,8 @@ deploy {
                 // getTargetTypeClass is a shortcut to get the class type using a string
 
                 frcJava(getArtifactTypeClass('FRCJavaArtifact')) {
+                    gcType = edu.wpi.first.gradlerio.deploy.roborio.GarbageCollectorType.Other
+                    jvmArgs << '-XX:+UseG1GC'
                 }
 
                 // Static files artifact
@@ -111,4 +116,14 @@ repositories {
 
 configurations.all {
     exclude group: "edu.wpi.first.wpilibj"
+}
+
+project.compileJava.dependsOn(createVersionFile)
+gversion {
+  srcDir       = "src/main/java/"
+  classPackage = "org.team5557"
+  className    = "BuildConstants"
+  dateFormat   = "yyyy-MM-dd HH:mm:ss z"
+  timeZone     = "America/New_York"
+  indent       = "  "
 }

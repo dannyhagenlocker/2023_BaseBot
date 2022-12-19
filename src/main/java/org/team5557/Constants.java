@@ -10,6 +10,7 @@ import edu.wpi.first.math.VecBuilder;
 import edu.wpi.first.math.Vector;
 import edu.wpi.first.math.geometry.Pose2d;
 import edu.wpi.first.math.geometry.Rotation2d;
+import edu.wpi.first.math.geometry.Translation2d;
 import edu.wpi.first.math.numbers.N3;
 import edu.wpi.first.math.numbers.N5;
 import edu.wpi.first.math.numbers.N7;
@@ -67,7 +68,7 @@ public final class Constants {
     public static final CoPilotConstants copilot = new CoPilotConstants();
     static {
         copilot.path_regeneration_time = 1.0;
-        copilot.max_path_length = Units.inchesToMeters(100.0);
+        copilot.max_path_length = Units.inchesToMeters(150.0);
         copilot.min_path_length = Units.inchesToMeters(12.0);
         copilot.error_radius = new Pose2d(Units.inchesToMeters(4), Units.inchesToMeters(4), Rotation2d.fromDegrees(3));
     }
@@ -76,6 +77,9 @@ public final class Constants {
     static {
         superstructure.trackwidth = 24.0;
         superstructure.drivebase = 24.0;
+
+        superstructure.center_of_rotation = new Translation2d();
+        superstructure.intake_center_of_rotation = new Translation2d(1.0, 0.0);
     }
 
     public static final PortConstants ports = new PortConstants();
@@ -95,6 +99,19 @@ public final class Constants {
         pathplanner.medium_constraints = new PathConstraints(3.0, 1);
         pathplanner.slow_constraints = new PathConstraints(2.0, 1.0);
         pathplanner.hellaslow_constraints = new PathConstraints(1.0, 1.0);
+    }
+
+    public static final FollowerConstants follower = new FollowerConstants();
+    static {
+        follower.theta_kP = 6.37;
+        follower.theta_kI = 0.0;
+        follower.theta_kD = 0.3;
+        follower.theta_kV = 2.0 * Math.PI;
+        follower.theta_kA = 10.0 * Math.PI;
+
+        follower.translation_kP = 5.0;
+        follower.translation_kI = 0.0;
+        follower.translation_kD = 0.0;
     }
 
     public static final ShuffleboardConstants shuffleboard = new ShuffleboardConstants();
@@ -125,6 +142,9 @@ public final class Constants {
     public static class SuperstructureConstants {
         public double trackwidth;
         public double drivebase;
+
+        public Translation2d center_of_rotation;
+        public Translation2d intake_center_of_rotation;
     }
 
     public static class PathPlannerConstants {
@@ -165,6 +185,18 @@ public final class Constants {
         public int steer_motor;
         public int steer_encoder;
         public double encoder_offset;
+    }
+
+    public static class FollowerConstants {
+        public double theta_kP;
+        public double theta_kI;
+        public double theta_kD;
+        public double theta_kV;
+        public double theta_kA;
+
+        public double translation_kP;
+        public double translation_kI;
+        public double translation_kD;
     }
 
     public static Mode getRobotMode() {

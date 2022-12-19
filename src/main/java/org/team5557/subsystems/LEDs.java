@@ -68,7 +68,6 @@ public class LEDs extends SubsystemBase {
 
     public LEDs() {
         ShuffleboardTab tab = Shuffleboard.getTab(Constants.shuffleboard.tunable_readout_key);
-        tab.add("Underglow", mUnderglowChooser).withSize(2, 1).withPosition(2, 0);
         configureCandle(); // set CTRE configurations for CANdle
 
         // create sendable choosers for shuffleboard
@@ -78,6 +77,7 @@ public class LEDs extends SubsystemBase {
                 mUnderglowChooser.addOption(state.getName(), state);
             }
             mUnderglowChooser.setDefaultOption("OFF", State.OFF);
+            tab.add("Underglow", mUnderglowChooser).withSize(2, 1).withPosition(2, 0);
         }
     }
 

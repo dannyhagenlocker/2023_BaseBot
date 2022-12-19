@@ -2,9 +2,10 @@ package org.team5557.commands.Swerve;
 
 import java.util.function.DoubleSupplier;
 
+import org.team5557.Constants;
+import org.team5557.RobotContainer;
 import org.team5557.subsystems.Swerve;
 
-import edu.wpi.first.math.controller.PIDController;
 import edu.wpi.first.math.kinematics.ChassisSpeeds;
 import edu.wpi.first.wpilibj2.command.CommandBase;
 
@@ -15,41 +16,40 @@ public class AimDrive extends CommandBase {
     private final DoubleSupplier m_translationXSupplier;
     private final DoubleSupplier m_translationYSupplier;
     private final DoubleSupplier goalAngleSupplierRadians;
-    private final PIDController rotationController;
 
-    public AimDrive(Swerve swerve, DoubleSupplier translationXSupplier,
+    public AimDrive(DoubleSupplier translationXSupplier,
             DoubleSupplier translationYSupplier, DoubleSupplier goalAngleSupplierRadians) {
-        this.swerve = swerve;
+        this.swerve = RobotContainer.swerve;
         this.m_translationXSupplier = translationXSupplier;
         this.m_translationYSupplier = translationYSupplier;
         this.goalAngleSupplierRadians = goalAngleSupplierRadians;
-        this.rotationController = swerve.rotationController;
-
         addRequirements(swerve);
     }
 
-    public AimDrive(Swerve swerve, DoubleSupplier translationXSupplier,
+    public AimDrive(DoubleSupplier translationXSupplier, 
             DoubleSupplier translationYSupplier, double goalAngleRadians) {
-        return AimDrive(swerve, translationXSupplier, translationYSupplier, ()-> ));
+        this(translationXSupplier, translationYSupplier, () -> goalAngleRadians);
     }
 
     @Override
     public void initialize() {
-        rotationController.reset();
+        RobotContainer.raw_controllers.resetTheta();
     }
 
     @Override
     public void execute() {
-        swerve.drive(ChassisSpeeds.fromFieldRelativeSpeeds(
+        double rotationalVelocity = RobotContainer.raw_controllers.calculateTheta(goalAngleSupplierRadians.getAsDouble()) * swerve.getMotorOutputLimiter();
+        rotationalVelocity += Math.copySign(Swerve.ROTATIONAL_STATIC_CONSTANT / Swerve.MAX_VOLTAGE
+                    * Swerve.MAX_ANGULAR_VELOCITY_RADIANS_PER_SECOND, rotationalVelocity);
+
+        swerve.drive(new ChassisSpeeds(
                 m_translationXSupplier.getAsDouble() * swerve.getMotorOutputLimiter(),
                 m_translationYSupplier.getAsDouble() * swerve.getMotorOutputLimiter(),
-                rotationController.calculate(swerve.getPose().getRotation().getRadians(), goalAngleSupplierRadians.getAsDouble()) * swerve.getMotorOutputLimiter(),
-                swerve.getPose().getRotation()));
+                rotationalVelocity), true, Constants.superstructure.center_of_rotation);
     }
 
     @Override
     public void end(boolean interrupted) {
-        swerve.drive(new ChassisSpeeds(0.0, 0.0, 0.0));
+        swerve.drive(new ChassisSpeeds(0.0, 0.0, 0.0), false, Constants.superstructure.center_of_rotation);
     }
-    
 }
